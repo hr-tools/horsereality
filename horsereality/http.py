@@ -72,7 +72,7 @@ class HTTPClient:
         return await perform()
 
     async def login(self):
-        self.session = self.session if self.session and self.session.open else aiohttp.ClientSession()
+        self.session = self.session if self.session and not self.session.closed else aiohttp.ClientSession()
 
         # HR generates a unique token on each page load of /login for XSRF protection, and requires it when actually logging in.
         # They provide this token in a cookie (XSRF-TOKEN) on pages viewable without authorization, but it is not usable directly.
