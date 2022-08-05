@@ -26,6 +26,7 @@ class Breed(Enum):
     knabstrupper = 'Knabstrupper'
     lusitano = 'Lusitano'
     mustang_horse = 'Mustang Horse'
+    namib_desert_horse = 'Namib Desert Horse'
     noriker_horse = 'Noriker Horse'
     norman_cob = 'Norman Cob'
     oldenburg_horse = 'Oldenburg Horse'
@@ -106,6 +107,10 @@ class BreedOrders(Enum):
     mustang_horse = {
         'stallion': ['body', 'mane', 'tail'],
         'mare': ['body', 'mane', 'tail']
+    }
+    namib_desert_horse = {
+        'stallion': ['tail', 'body', 'mane'],
+        'mare': ['tail', 'body', 'mane']
     }
     noriker_horse = {
         'stallion': ['body', 'mane', 'tail'],
