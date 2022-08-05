@@ -1,9 +1,7 @@
 import aiohttp
 from bs4 import BeautifulSoup
-import re
 
 from .errors import *
-from .utils import page_regex
 
 
 class HTTPClient:

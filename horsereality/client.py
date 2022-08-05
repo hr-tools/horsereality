@@ -1,6 +1,4 @@
-import aiohttp
 import asyncio
-import re
 
 from .models import Horse
 from .http import HTTPClient
