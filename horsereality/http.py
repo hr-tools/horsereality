@@ -16,7 +16,7 @@ class HTTPClient:
         self.cookies = {}
 
         # We have to provide a user agent in order to avoid getting blocked from creating sessions.
-        # 
+        # Unfortunately the very nature of this requirement prevents its solution from being very detailed.
         self.user_agent = f'HorseReality/{__version__}'
 
     async def request(self, method: str, path: str, *, v2: bool = False, **kwargs):
