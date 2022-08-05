@@ -1,6 +1,7 @@
 import aiohttp
 from bs4 import BeautifulSoup
 
+from . import __version__
 from .errors import *
 
 
@@ -13,6 +14,10 @@ class HTTPClient:
         }
         self.session = None
         self.cookies = {}
+
+        # We have to provide a user agent in order to avoid getting blocked from creating sessions.
+        # 
+        self.user_agent = f'HorseReality/{__version__}'
 
     async def request(self, method: str, path: str, *, v2: bool = False, **kwargs):
         url = f'https://{"v2" if v2 else "www"}.horsereality.com{path}'
@@ -70,7 +75,7 @@ class HTTPClient:
         return await perform()
 
     async def login(self):
-        self.session = self.session if self.session and not self.session.closed else aiohttp.ClientSession()
+        self.session = self.session if self.session and not self.session.closed else aiohttp.ClientSession(headers={'User-Agent': self.user_agent})
 
         # HR generates a unique token on each page load of /login for XSRF protection, and requires it when actually logging in.
         # They provide this token in a cookie (XSRF-TOKEN) on pages viewable without authorization, but it is not usable directly.
