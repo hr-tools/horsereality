@@ -120,7 +120,7 @@ Raised when a page is accessed successfully, but it displays an error message (e
 
 #### `RolloverRequired`
 
-Raised when a page could not be accessed because the client's account has not been rolled over (see also: `Client.rollover`).
+Raised when a page could not be accessed because the client's account has not been rolled over (see also: [`Client.rollover`](#await-rollover)).
 
 ##### Attributes
 
