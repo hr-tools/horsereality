@@ -15,11 +15,13 @@ class Client:
         remember_cookie_value: str,
         *,
         auto_rollover: bool = False,
+        allow_unverified_client: bool = False,
     ):
         self.http = HTTPClient(
             remember_cookie_name,
             remember_cookie_value,
             auto_rollover=auto_rollover,
+            allow_unverified_client=allow_unverified_client,
         )
 
     async def verify(self) -> None:

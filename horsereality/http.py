@@ -1,12 +1,18 @@
 import datetime
-from typing import Dict, Optional, Tuple
+from typing import Optional
 from urllib.parse import urlparse
 import aiohttp
 import asyncio
 from bs4 import BeautifulSoup
 
 from . import __version__
-from .errors import HTTPException, AuthenticationException, RolloverRequired
+from .errors import (
+    ClientNotInitialized,
+    HTTPException,
+    RateLimitExceeded,
+    AuthenticationException,
+    RolloverRequired,
+)
 
 
 class HTTPClient:
@@ -16,17 +22,25 @@ class HTTPClient:
         remember_cookie_value: str,
         *,
         auto_rollover: bool = False,
+        allow_unverified_client: bool = False,
     ):
         self.session: Optional[aiohttp.ClientSession] = None
         self.remember_cookie = {remember_cookie_name: remember_cookie_value}
 
+        self._allow_unverified_client: bool = allow_unverified_client
+        self.last_request_attempt_at: Optional[datetime.datetime] = None
+
         self._auto_rollover: bool = auto_rollover
         self._rollover_lock: Optional[asyncio.Lock] = None
-        # self.last_rollover_at: Optional[datetime.datetime] = None
 
         # We have to provide a user agent in order to avoid getting blocked from creating sessions.
         # Unfortunately the very nature of this requirement prevents its solution from being very detailed.
         self.user_agent = f'HorseReality/{__version__}'
+
+    @property
+    def cookies(self):
+        cookie = self.remember_cookie.copy()
+        return cookie
 
     async def request(self, method: str, path: str, *, v2: bool = False, **kwargs):
         url = f'https://{"v2" if v2 else "www"}.horsereality.com{path}'
@@ -37,6 +51,15 @@ class HTTPClient:
 
         async with self._rollover_lock:
             for tries in range(5):
+                if not self.session or self.session.closed:
+                    print(self.last_request_attempt_at, tries)
+                    if self.last_request_attempt_at and (datetime.datetime.utcnow() - self.last_request_attempt_at).seconds >= 600 and tries == 0:
+                        print('reinitializing')
+                        await self.initialize()
+                        continue
+                    else:
+                        raise ClientNotInitialized()
+
                 response = await self.session.request(method=method, url=url, **kwargs)
                 location = urlparse(response.headers.get('location')) if response.headers.get('location') else None
 
@@ -62,14 +85,12 @@ class HTTPClient:
                     await self.initialize()
                     continue
 
-                elif response.status == 429:
-                    # We are unlikely to be rate limited, but back-off just in case anyway.
-                    if tries == 5:
-                        # Give up
-                        raise HTTPException(response, 'Failed to back-off a rate limit 5 times in a row.')
-
-                    await asyncio.sleep(3)
-                    continue
+                elif response.status in (403, 429):
+                    # Horse Reality ended up implementing very strict rate
+                    # limiting that isn't so straightforwardly backed off.
+                    # Let a different timer handle it.
+                    await self.uninitialize()
+                    raise RateLimitExceeded(response)
 
                 if (response.headers.get('Content-Type') or '').split('/')[0] == 'image':
                     data = await response.read()
@@ -94,13 +115,21 @@ class HTTPClient:
         get_response = await self.session.request(
             'GET', 'https://v2.horsereality.com/login',
             params={'v1RedirectUrl': 'https://www.horsereality.com'},
-            cookies=self.remember_cookie,
+            cookies=self.cookies,
             allow_redirects=False,
         )
 
-        if get_response.status != 302:
-            raise AuthenticationException('Invalid remembrance cookie name or value.')
+        if self._allow_unverified_client and get_response.status != 302:
+            await self.uninitialize()
+            return
+        elif get_response.status >= 500:
+            raise HTTPException(get_response, 'Server error while logging in')
+        elif get_response.status in (403, 429):
+            raise RateLimitExceeded(get_response)
+        elif get_response.status != 302:
+            raise AuthenticationException('Failed to log in, likely due to an invalid remembrance cookie name or value.')
 
+        self.last_request_attempt_at = None
         if urlparse(get_response.headers['location']).path.startswith('/daily-rollover'):
             # Authentication for v1 was halted by the rollover page
             if self._auto_rollover:
@@ -124,6 +153,11 @@ class HTTPClient:
             cookie_response.cookies['horsereality'].value
         except (KeyError, AttributeError):
             raise AuthenticationException()
+
+    async def uninitialize(self):
+        self.last_request_attempt_at = datetime.datetime.utcnow()
+        await self.session.close()
+        print('Closed session without initializing due to failed login response')
 
     async def get_horse(self, lifenumber: int) -> str:
         data = await self.request('GET', f'/horses/{lifenumber}/')

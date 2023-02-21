@@ -44,13 +44,17 @@ asyncio.run(show_horse(7187887))
 
 The featureset is fairly limited at this time, developed primarily according to the needs of the Realtools API.
 
-### `horsereality.Client(remember_cookie_name: str, remember_cookie_value: str, *, auto_rollover: bool = False)`
+### `horsereality.Client(remember_cookie_name: str, remember_cookie_value: str, *, auto_rollover: bool = False, allow_unverified_client: bool = False)`
 
-This is the main client class that your session will live in an instance of, and that with external calls will usually be made. In order to create an instance of this class, you will need to grab the value of the cookie starting with `remember_web_` that your browser is sent upon logging in to Horse Reality with the "remember me" option enabled (the `Set-Cookie` header in the response of POST /login). This "remember" cookie is typically set to expire after 5 years - 1 day, so you should be safe from replacing it often.
+This is the main client class that your session will live in an instance of, and that with external calls will usually be made. In order to create an instance of this class, you will need to grab the value of the cookie starting with `remember_web_` that your browser is sent upon logging in to Horse Reality with the "remember me" option enabled (the `Set-Cookie` header in the response of POST /login). This "remember" cookie is typically set to expire after 5 years - 1 day, so you should be safe from replacing it often, unless Horse Reality invalidates it (which is known to happen).
 
 #### Rollover
 
 Every day at 0:00 in the Netherlands, Horse Reality requires the client to "roll over" their account. The module allows this to be done manually via a call to [`Client.rollover`](#await-rollover), but it will be done automatically (as soon as necessary) if the `auto_rollover` parameter is provided as `True` while constructing the `Client`. By default, however, it is disabled.
+
+#### Rate Limiting
+
+Horse Reality has implemented a rate limit that may affect applications with a large stream of requests that it must proxy (like [Realtools](https://realtools.shay.cat)). Details are very sparse but this package attempts to handle everything as smoothly as possible. If you would like to run your application in a state where it is temporarily unauthenticated, pass `allow_unverified_client` as `True` in your `Client`. For more details, see [`ClientNotInitialized`](#clientnotinitialized).
 
 #### Methods
 
@@ -106,9 +110,17 @@ Fetches the dam's foal. If `foal_lifenumber` is not `None`, returns a [`Horse`](
 
 All library exceptions are subclasses of `horsereality.HorseRealityException`.
 
+#### `ClientNotInitialized`
+
+When `allow_unverified_client` is enabled, this will be raised after attempting to make a request while the client's session was closed due to uninitialization, usually as a result of a Cloudflare rate limit or security check, or invalid credentials. The package will attempt to reinitialize when prompted to make a request after 10 minutes have elapsed since the prior uninitialization. If you are uninitialized because of invalid credentials, this will be an infinite loop (though not hanging), but if you are simply being rate limited, this should cause the client to resume normal operation when the block has expired.
+
 #### `HTTPException`
 
 A request failed.
+
+#### `RateLimitExceeded`
+
+A Cloudflare rate limit or ban was encountered.
 
 #### `AuthenticationException`
 
