@@ -62,8 +62,9 @@ class HTTPClient:
                 location = urlparse(response.headers.get('location')) if response.headers.get('location') else None
 
                 if (location and location.path == '/error-404') or response.status == 404:
-                    # HR does not properly return a 404 page and instead cycles the client between two URLs,
-                    # so we have to handle this ourselves.
+                    # In the past, HR has not properly returned a 404 page and instead cycled the
+                    # client between two URLs, so we had to handle this ourselves. Nowadays this
+                    # should not happen.
                     raise HTTPException(response, f'Page not found: {url}')
 
                 elif location and location.path.startswith('/daily-rollover') and not path.startswith('/daily-rollover'):
