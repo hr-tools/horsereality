@@ -52,9 +52,7 @@ class HTTPClient:
         async with self._rollover_lock:
             for tries in range(5):
                 if not self.session or self.session.closed:
-                    print(self.last_request_attempt_at, tries)
                     if self.last_request_attempt_at and (datetime.datetime.utcnow() - self.last_request_attempt_at).seconds >= 600 and tries == 0:
-                        print('reinitializing')
                         await self.initialize()
                         continue
                     else:
